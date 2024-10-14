@@ -3,19 +3,16 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\EmployeeResource\Pages;
-use App\Filament\Resources\EmployeeResource\RelationManagers;
+use App\Models\City;
 use App\Models\Employee;
 use App\Models\State;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Set;
 use Filament\Notifications\Collection;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Schema;
-use App\Filament\Resources\Get;
 
 class EmployeeResource extends Resource
 {
@@ -26,99 +23,115 @@ class EmployeeResource extends Resource
     protected static ?string $navigationGroup = "Employee Management";
 
     public static function form(Form $form): Form
-{
-    return $form
-        ->schema([
-            // Section Relationship
-            Forms\Components\Section::make('Relationship')
-                ->description('Assign the appropriate relationships')
-                ->schema([
-                    Forms\Components\Select::make('country_id')
-                        ->relationship(name: 'country', titleAttribute: 'name')
-                        ->searchable()
-                        ->preload()
-                        ->live()
-                        ->required(),
-                    Forms\Components\TextInput::make('state_id')
-                        ->options(fn (Get $get) :Collection => State::query()
-                            ->where('country_id', $get->get('country_id'))
-                            ->pluck('id', 'name'))
-                        ->searchable()
-                        ->preload()
-                        ->required(),
-                    Forms\Components\TextInput::make('city_id')
-                    ->options(fn (Get $get) :Collection => State::query()
-                    ->where('state_id', $get->get('state_id'))
-                    ->pluck('id', 'name'))
-                    ->searchable()
-                        ->preload()
-                        ->required(),
-                    Forms\Components\TextInput::make('department_id')
-                        ->label('Department ID')
-                        ->required()
-                        ->numeric(),
-                ]),
+    {
+        return $form
+            ->schema([
+                // Section Relationship
+                Forms\Components\Section::make('Relationship')
+                    ->description('Assign the appropriate relationships')
+                    ->schema([
+                        Forms\Components\Select::make('country_id')
+                            ->relationship('country', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(function (Set $set) {
+                                $set('state_id', null);
+                                $set('city_id', null);
+                            })
+                            ->required(),
+                        Forms\Components\Select::make('state_id')
+                            ->options(fn($get) => State::where('country_id', $get('country_id'))
+                                ->pluck('name', 'id'))
+                            ->live()
+                            ->afterStateUpdated(fn(Set $set): mixed => $set('city_id', null))
+                            ->searchable()
+                            ->preload()
+                            ->required(),
+                        Forms\Components\Select::make('city_id')
+                            ->options(fn($get) => City::where('state_id', $get('state_id'))
+                                ->pluck('name', 'id'))
+                            ->searchable()
+                            ->live()
+                            ->preload()
+                            ->required(),
+                        Forms\Components\Select::make('department_id')
+                            ->relationship('department', titleAttribute: 'name')
+                            ->preload()
+                            ->searchable()
+                            ->required(),
+                    ])->columns(2),
 
-            // Section User Name
-            Forms\Components\Section::make('User Name')
-                ->description('Put the user name details')
-                ->schema([
-                    Forms\Components\TextInput::make('first_name')
-                        ->label('First Name')
-                        ->required()
-                        ->maxLength(255),
-                    Forms\Components\TextInput::make('last_name')
-                        ->label('Last Name')
-                        ->required()
-                        ->maxLength(255),
-                    Forms\Components\TextInput::make('middle_name')
-                        ->label('Middle Name')
-                        ->maxLength(255)
-                        ->default(null),
-                ]),
+                // Section User Name
+                Forms\Components\Section::make('User Name')
+                    ->description('Put the user name details')
+                    ->schema([
+                        Forms\Components\TextInput::make('first_name')
+                            ->label('First Name')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('middle_name')
+                            ->label('Middle Name')
+                            ->maxLength(255)
+                            ->default(null),
+                        Forms\Components\TextInput::make('last_name')
+                            ->label('Last Name')
+                            ->required()
+                            ->maxLength(255),
+                    ])->columns(3),
 
-            // Section User Address
-            Forms\Components\Section::make('User Address')
-                ->description('Provide the user\'s address details')
-                ->schema([
-                    Forms\Components\TextInput::make('address')
-                        ->label('Address')
-                        ->required()
-                        ->maxLength(255),
-                    Forms\Components\TextInput::make('zip_code')
-                        ->label('ZIP Code')
-                        ->required()
-                        ->maxLength(255),
-                ]),
+                // Section User Address
+                Forms\Components\Section::make('User Address')
+                    ->description('Provide the user\'s address details')
+                    ->schema([
+                        Forms\Components\TextInput::make('address')
+                            ->label('Address')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('zip_code')
+                            ->label('ZIP Code')
+                            ->required()
+                            ->maxLength(255),
+                    ])->columns(2),
 
-            // Additional Fields
-            Forms\Components\DatePicker::make('date_of_birth')
-                ->label('Date of Birth')
-                ->required(),
-            Forms\Components\DatePicker::make('date_hired')
-                ->label('Date Hired')
-                ->required()
-                ->columnSpanFull(),
-        ])->columns(3);
-}
-
+                // Additional Fields
+                Forms\Components\Section::make('Dates')
+                    ->description('Provide the user\'s date details')
+                    ->schema([
+                        Forms\Components\DatePicker::make('date_of_birth')
+                            ->label('Date of Birth')
+                            ->native(false)
+                            ->displayFormat('d/m/Y')
+                            ->required(),
+                        Forms\Components\DatePicker::make('date_hired')
+                            ->label('Date Hired')
+                            ->native(false)
+                            ->displayFormat('d/m/Y')
+                            ->required()
+                    ])->columns(2),
+            ]);
+    }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('country_id')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('state_id')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('city_id')
-                    ->numeric()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('department_id')
-                    ->numeric()
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('country.name')
+                    ->label('Country')
+                    ->sortable()
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('state.name')
+                    ->label('State')
+                    ->sortable()
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('city.name')
+                    ->label('City')
+                    ->sortable()
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('department.name')
+                    ->label('Department')
+                    ->sortable()
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('first_name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('last_name')

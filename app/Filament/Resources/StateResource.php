@@ -6,6 +6,7 @@ use App\Filament\Resources\StateResource\Pages;
 use App\Filament\Resources\StateResource\RelationManagers;
 use App\Models\State;
 use Filament\Forms;
+use Filament\Forms\Components\Tabs\Tab;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -27,7 +28,7 @@ class StateResource extends Resource
                     ->required()
                     ->maxLength(255),
                 Forms\Components\Select::make('country_id')
-                ->relationship(name:'country', titleAttribute:'name')
+                    ->relationship(name: 'country', titleAttribute: 'name')
                     ->required()
                     ->placeholder('Select country...')
                     ->searchable(),
@@ -38,11 +39,14 @@ class StateResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')
+                Tables\Columns\TextColumn::make('country.name')
+                    ->sortable()
                     ->searchable(),
-                Tables\Columns\TextColumn::make('country_id')
-                    ->numeric()
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('name')
+                    ->label('State Name')
+                    ->sortable()
+                    ->searchable()
+                    ->visible(auth()->user()->email === 'admin@admin.com'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -51,10 +55,11 @@ class StateResource extends Resource
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-            ])
+            ])->defaultSort('country.name')
             ->actions([
-                Tables\Actions\ViewAction::make(),
+                Tables\Actions\ViewAction ::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
